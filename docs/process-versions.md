@@ -8,11 +8,23 @@ stronger Light sliders, issue #196) without changing a single photo someone has 
 | Process | What it changes |
 |---|---|
 | **V1** | LightCraft's rendering from before process versions existed. Frozen. |
-| **V2** (the latest) | Highlights and Shadows keep fine detail (issue #632): their base layer (`local::tone_base`) is the edge-aware filter of a separable median of log luminance (radius 0.15 % of the long edge, at most 24 px, `local::BASE_DETAIL`) instead of log luminance itself, so twigs, lines and texture take their surroundings' shift and keep their contrast; region edges stay sharp. CPU (`local::prepare`) and GPU prepare branch on `local::tone_base_detail` (0 = no median under V1); the base plane is cached per process (`local::BaseKey`). Renders without Highlights or Shadows (global or local) are the same as V1's. Tone map unchanged. |
+| **V2** | Highlights and Shadows keep fine detail (issue #632): their base layer (`local::tone_base`) is the edge-aware filter of a separable median of log luminance (radius 0.15 % of the long edge, at most 24 px, `local::BASE_DETAIL`) instead of log luminance itself, so twigs, lines and texture take their surroundings' shift and keep their contrast; region edges stay sharp. CPU (`local::prepare`) and GPU prepare branch on `local::tone_base_detail` (0 = no median under V1); the base plane is cached per process (`local::BaseKey`). Renders without Highlights or Shadows (global or local) are the same as V1's. Tone map unchanged. Frozen. |
+| **V3** (the latest) | Luminance NR protects coherent texture and edge transitions (`local::guided_nr`): a blurred Scharr structure tensor identifies a dominant direction, and a tangential average replaces part of the self-guided result there. NR Detail controls directional protection; NR Contrast retains edge contrast above a fixed gradient-energy threshold, not a calibrated noise floor. Positive lattice weights avoid bilinear interpolation blurring fine diagonals. NR radii, blend and preview scaling come from `local::nr_params`; CPU/GPU implement the same operation. Sharpening consumes Radius and Detail (`ctl:detail.sharpenRadius`, `ctl:detail.sharpenDetail`): Radius controls an independent Gaussian band, never the Texture/local Noise/Defringe band; Detail controls the halo clamp (0.20 at Detail 0 to 1.60 at Detail 100) and micro-contrast response. Process participates in `Plan::pre_nr_key`; the two detail bands are cached by their own radii. Colour NR and tone are unchanged from V2; V1/V2 retain legacy fixed sharpening and self-guided NR. Camera-profile additions are separate from process versions. |
+
+V3 blends in cell-centred gradients in reduced previews so pixel-wide stripes still have a
+detectable orientation. Its draft renders recompute wide planes after an NR change rather than
+reusing V1/V2's approximate stand-ins; the more directional changes otherwise leave stale clarity.
+
+Review correction (2026-10-20): the initial Radius implementation blended its radius into the
+shared Texture band. A local sharpening mask could consequently change Texture outside the mask.
+CPU and GPU now use independent planes; tests assert exact outside-mask pixels and fresh/cached
+agreement. V1/V2 use the old radius in both bands and share the buffer when the radii agree.
+The V3 sharpening radius is `max(radius * 0.0006 * px_per_long, 0.6)`; Texture remains
+`max(0.0018 * px_per_long, 0.6)`. These are resolution-relative widths, not fixed native pixels.
 
 ## The rule
 
-**A change that alters how existing settings render ships as a new process. V1 is frozen.**
+**A change that alters how existing settings render ships as a new process. V1 and V2 are frozen.**
 
 - A deliberate change of look (tone model, slider response, default curve, how a stage interprets a
   value) goes into a new process. Photos stay on the process they have until someone runs Update to
@@ -29,11 +41,11 @@ neutral settings; edited curves keep the shoulder and their V1 look.
 
 ## Adding a process
 
-1. Add a variant to `Process` (`V2`), append it to `Process::ALL` (oldest first), give it its number in
+1. Add a variant to `Process`, append it to `Process::ALL` (oldest first), give it its number in
    `Process::version` and make it `Process::LATEST`.
 2. The compiler then points at every `match` on `Process`. The base tone map is chosen in one place,
    `lightcraft_pipeline::finish::base_tone` (both the CPU and the GPU renderer take it from there): give
-   V2 its own arm and leave V1's alone. A process that changes another stage branches there the same
+   the new process its own arm and leave the old ones alone. A process that changes another stage branches there the same
    way, on `s.process.process()`; if that stage is cached (`Plan::lin_key`, the planes in `local.rs`),
    add the process to its key.
 3. Keep `settings_saved_before_process_versions_load_as_v1` (`crates/develop/src/tests_process.rs`)

@@ -4,6 +4,22 @@ The CPU pipeline (`crates/pipeline`) is the reference ("oracle"). `lightcraft-gp
 evaluates the same stages with wgpu compute shaders (WGSL) on Metal / Vulkan / DX12. Everything is
 pure Rust (wgpu, naga); the drivers are the system's. No GL backend is compiled in.
 
+Process V3's coherent-texture luminance NR mirrors `local::guided_nr`: `nr_tensor` computes
+Scharr gradient products (blended with cell-centred gradients in reduced previews to retain
+Nyquist stripes), the shared Gaussian filter averages them, and `nr_coherent` mixes a
+tangential lattice average with the frozen self-guided base. NR parameters and nine spatial
+weights come from the CPU; V1/V2 skip both new kernels, as does V3 with both NR Detail and
+NR Contrast zero. Equivalence tests cover
+all three processes at full and preview sizes; the process participates in the shared stage-cache
+key. See [process-versions.md](process-versions.md) and the measured limits in
+[raw-parity.md](raw-parity.md#v3-direction-aware-spatial-nr-2026-10-20).
+
+Sharpening and Texture/local Noise/Defringe use independent radius-keyed planes (review fix,
+2026-10-20). They share storage when the radii agree; otherwise two bands are packed into the
+existing texture binding, preserving the device's storage-buffer requirements. GPU cache
+accounting includes the sharpening plane, and equivalence tests cover radius changes with
+Texture and local sharpening/noise enabled across V1/V2/V3.
+
 Warped geometry uses a CPU-computed coverage bit mask for the source boundary.
 The CPU reference evaluates that boundary in double precision; GPU float
 rounding otherwise can turn a blank edge pixel into a photo pixel. The mask

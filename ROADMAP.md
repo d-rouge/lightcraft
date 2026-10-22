@@ -2,7 +2,7 @@
 
 **Stage: alpha** · next: beta, ~14 points and ~340–600 h away
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-16 · **Change:** minor (Minolta MRW decoded, 6 bodies verified; RAW: 83% of Adobe's models decode, 38% verified after the camera-coverage sweep #1327; German catalog 91% → 97%: interface strings and What's New lines translated) · **Target:** Adobe Lightroom Classic 15.5 / Lightroom 9.6
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-21 · **Change:** minor (Minolta MRW decoded, 6 bodies verified; RAW: 83% of Adobe's models decode, 38% verified after the camera-coverage sweep #1327; German catalog 91% → 97%; RAW diagnostics corrected, 8 automatic colour profiles with the unqualified X-T1 opt-in, readiness unchanged) · **Target:** Adobe Lightroom Classic 15.5 / Lightroom 9.6
 
 One-page summary of how close LightCraft is to Adobe Lightroom. Agents: read this, then pick work
 from [docs/gaps.md](docs/gaps.md). The full assessment, method and evidence are in
@@ -29,7 +29,7 @@ Each audience with its own hours (Opus 5.5 agent wall-clock hours to ~95%):
 | Essentials user | **~65%** | **160–300 h** (~50% parallelizes) | default raw look for popular cameras; launch stability; basic-slider feel; opening CR3 / HEIC files people send |
 
 The gap between breadth and readiness is quality and coverage, not missing buttons: camera colour is
-estimated rather than measured, CR3 decodes on 26 verified Canon bodies (rarer CRX variants still open as previews), compressed ORF and HE NEF
+estimated rather than measured (8 pooled profiles are automatic; the unqualified X-T1 candidate is opt-in), CR3 decodes on 26 verified Canon bodies (rarer CRX variants still open as previews), compressed ORF and HE NEF
 open as previews, rendering is tuned by eye, AI masks are heuristics, there is no lens database, and
 tests run in CI on FreeBSD only. **Why alpha:** core workflows run end to end, but readiness is below
 the ~75% beta bar (it is above the ~40% alpha bar) and Lightroom's main inputs, raw files, still have blocking gaps (compressed ORF and HE NEF open as previews; Canon,
@@ -114,6 +114,10 @@ Ranked toward beta; detail in [docs/roadmap.md](docs/roadmap.md), gaps in [docs/
 
 ## Progress log
 
+- 2026-10-21: X-Trans diagnostic review corrects frequency/chroma blind spots and shares version-2
+  metrics between both harnesses. Historical Nyquist/maze interpretations are withdrawn, not
+  replaced by a fidelity claim. X-T1 colour JSON stays an opt-in candidate pending provenance and
+  held-out validation; 8 profiles remain automatic. Denoising threshold and readiness unchanged.
 - 2026-10-14: Camera-coverage sweep verifies 30 more models on 40 CC0 files, with file and sensor
   hashes pinned (`docs/raw/coverage.py`: 515 → 545 verified). Eleven candidates excluded after rechecking
   identity, provenance and camera-image agreement. Phone and drone DNG tone differences remain tracked in #1277.
@@ -186,6 +190,7 @@ Ranked toward beta; detail in [docs/roadmap.md](docs/roadmap.md), gaps in [docs/
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-21 | patch | Correct X-Trans diagnostic interpretation and recount 8 automatic colour profiles after making unqualified X-T1 opt-in. No gap closed or readiness change. |
 | 2026-10-19 | minor | Indonesian interface (`id`): every plain and formats message, plus 69 command labels, locale, menu command and tests; What's New left in English; Localization ~55% → ~64% (mean of the 12 key languages), 8 of 12 present |
 | 2026-10-12 | minor | Italian interface (`it`, #1192): 2,201 of 2,398 messages, locale, menu command and tests; headline numbers unchanged |
 | 2026-10-13 | minor | Sony ILCA-99M2 camera colour profile in the log; numbers unchanged |

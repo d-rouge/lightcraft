@@ -2,6 +2,19 @@
 
 ARW, NEF, RW2, RAF, CR3, CR2, PEF, SRW, ORF, ERF and MRW decoding supply sensor data and camera white-balance multipliers, but currently no measured camera colour matrix. Treating camera RGB as linear sRGB produces a dark, muted default rendering. The loader now estimates a file-local starting look from that file's embedded camera JPEG, only when a usable camera matrix is absent. All output pixels still come from the RAW sensor data; there is no JPEG replacement or uniform saturation boost.
 
+**X-T1 candidate (2026-10-21):** `assets/camera-profiles/X-T1.json` is not an automatic profile.
+Its training manifest and disjoint hold-out qualification were not retained, so X-T1 keeps the
+existing per-file fit/fallback. The JSON remains available for an explicit local experiment:
+copy it to a dedicated folder and launch with `LIGHTCRAFT_CAMERA_PROFILES=/absolute/path/to/folder`.
+Restart after changes because profiles are cached per process. This opt-in changes source colour,
+independently of Process V1/V2/V3, and is not a guarantee of Fujifilm/converter fidelity.
+
+**Follow-up:** the [X-Trans qualification plan](raw-parity.md#x-trans-follow-up-plan-qualification-before-more-tuning)
+defines the future manifest/report workflow, scene-disjoint validation and controlled acquisitions.
+The current `calibrate` command fits a camera-JPEG look; it does not yet generate that provenance
+record or perform measured chart calibration. Recover the original training inputs or refit a
+new documented candidate before reconsidering automatic X-T1 activation.
+
 ## Colour and tone are separate
 
 A fixed sensor proxy of at most 96×96 is developed with the file's WB, black/white levels and active crop. The embedded JPEG is decoded with DCT scaling and a 128-million-pixel input limit (61 MP bodies' JPEGs, e.g. the ILCE-7RM6 full frame at 66.5 MP, exceed 64 MP; the codec checks the cap before decoding at full size, about 200 MB transient), converted through the codec's colour management, and reduced to the same size. Aspect ratios must agree within 2%. For colour fitting, near-black, clipped and nonfinite samples are excluded. Learning a colour matrix requires at least 256 paired pixels, 5% coloured samples (linear channel spread >0.05) and a nonsingular input covariance with bounded condition. An existing camera profile supplies the colour model: fitting only tone still requires 256 pairs and 5% non-monochrome samples, but permits channel spread >0.005 so dark or dull scenes can use the known colours. Any tone curve (full, partial or black-and-white look) also needs some contrast: the scene luminance of the brightest 1/32 of the pairs must be at least 1.2× that of the darkest 1/32 (`MIN_TONE_RANGE`); below that, the range check refuses the curve, which leaves only nearly uniform frames. A curve under 1.5× (the limit until issue #631) must also render the frame's bright areas, which the fit and the held-out gates leave out (camera JPEG luminance 0.85 and up), no further from the camera JPEG than the neutral fallback does (in luminance for a black-and-white JPEG): fitted to a narrow range, it extrapolates them. A hazy ILCE-7RM4 burst at 1.46 to 1.49 opened with the neutral fallback, 18 L\* darker than its camera JPEG, while the frame at 1.51 got a look at a held-out RMS of 0.013; with 1.2 they all do. Across 135 public Sony files the lowest range is 4.0, so none of them changes.
