@@ -70,6 +70,100 @@ fn guided_apply(@builtin(global_invocation_id) g: vec3<u32>, @builtin(num_workgr
     dst[i] = b[2u * i] * a[i] + b[2u * i + 1u];
 }
 
+fn nr_at(x: i32, y: i32) -> f32 {
+    let w = i32(pu(1u));
+    let h = i32(pu(2u));
+    return a[u32(clamp(y, 0, h - 1) * w + clamp(x, 0, w - 1))];
+}
+
+// Scharr/cell gradient products; P[1..4] = width, height, cell contribution.
+@compute @workgroup_size(256)
+fn nr_tensor(@builtin(global_invocation_id) g: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>) {
+    let i = lin_index(g, nw);
+    if (i >= pu(0u)) { return; }
+    let x = i32(i % pu(1u));
+    let y = i32(i / pu(1u));
+    let gx = (3.0 * (nr_at(x + 1, y - 1) - nr_at(x - 1, y - 1))
+        + 10.0 * (nr_at(x + 1, y) - nr_at(x - 1, y))
+        + 3.0 * (nr_at(x + 1, y + 1) - nr_at(x - 1, y + 1))) / 32.0;
+    let gy = (3.0 * (nr_at(x - 1, y + 1) - nr_at(x - 1, y - 1))
+        + 10.0 * (nr_at(x, y + 1) - nr_at(x, y - 1))
+        + 3.0 * (nr_at(x + 1, y + 1) - nr_at(x + 1, y - 1))) / 32.0;
+    var products = vec3<f32>(gx * gx, gx * gy, gy * gy);
+    if (pf(3u) > 0.0) {
+        let aa = nr_at(x, y);
+        let bb = nr_at(x + 1, y);
+        let cc = nr_at(x, y + 1);
+        let dd = nr_at(x + 1, y + 1);
+        let cx = (bb - aa + dd - cc) * 0.5;
+        let cy = (cc - aa + dd - bb) * 0.5;
+        products += pf(3u) * (vec3<f32>(cx * cx, cx * cy, cy * cy) - products);
+    }
+    put_rgb(i, products);
+}
+
+fn nr_tangent_sample(x: i32, y: i32, t: vec2<f32>, step: f32) -> f32 {
+    let pos = t * step;
+    let lo = vec2<i32>(floor(pos));
+    var sample = 0.0;
+    var total = 0.0;
+    for (var ix = 0; ix <= 1; ix += 1) {
+        for (var iy = 0; iy <= 1; iy += 1) {
+            let offset = lo + vec2<i32>(ix, iy);
+            let d = vec2<f32>(offset);
+            let across = t.x * d.y - t.y * d.x;
+            let delta = d - pos;
+            let cost = across * across + 0.001 * dot(delta, delta);
+            let inv = 1.0 / (0.001 + cost);
+            let squared = inv * inv;
+            let weight = squared * squared;
+            sample += weight * nr_at(x + offset.x, y + offset.y);
+            total += weight;
+        }
+    }
+    return sample / total;
+}
+
+// `local::guided_nr`: a = log luminance, b = blurred tensor, c = frozen guided base.
+// P[1..4] = width, height, protection; P[4..13] = nine Gaussian weights; P[13] = contrast.
+@compute @workgroup_size(256)
+fn nr_coherent(@builtin(global_invocation_id) g: vec3<u32>, @builtin(num_workgroups) nw: vec3<u32>) {
+    let i = lin_index(g, nw);
+    if (i >= pu(0u)) { return; }
+    let xx = b[3u * i];
+    let xy = b[3u * i + 1u];
+    let yy = b[3u * i + 2u];
+    let disc = sqrt((xx - yy) * (xx - yy) + 4.0 * xy * xy);
+    let small = max((xx + yy - disc) * 0.5, 0.0);
+    let large = (xx + yy + disc) * 0.5;
+    var val = c[i];
+    if (pf(3u) > 0.0) {
+        let confidence = pf(3u) * clamp(1.0 - 4.0 * small / max(large, 1e-12), 0.0, 1.0);
+        if (confidence > 0.0) {
+            var t = vec2<f32>(yy - small, -xy);
+            if (xx >= yy) { t = vec2<f32>(-xy, xx - small); }
+            t /= max(length(t), 1e-12);
+            let x = i32(i % pu(1u));
+            let y = i32(i / pu(1u));
+            var sum = 0.0;
+            var total = 0.0;
+            for (var step = -4; step <= 4; step += 1) {
+                let weight = pf(u32(step + 8));
+                sum += weight * nr_tangent_sample(x, y, t, f32(step));
+                total += weight;
+            }
+            val += confidence * (sum / total - val);
+        }
+    }
+    let contrast = pf(13u);
+    let tau_contrast = 0.005;
+    if (contrast > 0.0 && large > tau_contrast) {
+        let c_edge = clamp((large - tau_contrast) / (large + tau_contrast), 0.0, 1.0);
+        val += contrast * 0.5 * c_edge * (a[i] - val);
+    }
+    dst[i] = val;
+}
+
 // Cross guided filter (`masks::guided_cross`), a: guide, b: input. P[1] = 0: (guide, input);
 // 1: (guide·input, guide²).
 @compute @workgroup_size(256)

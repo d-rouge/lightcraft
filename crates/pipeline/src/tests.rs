@@ -254,6 +254,7 @@ fn drafts_keep_wide_planes_across_a_noise_reduction_change_and_full_renders_do_n
     let draft = RenderRequest { quality: Quality::Draft, ..RenderRequest::fit(160, 160) };
     let full = RenderRequest { quality: Quality::Full, ..draft };
     let mut s = typical_edits();
+    s.process = lightcraft_develop::Process::V2.version();
     s.effects.clarity = 60.0;
     render_cached(&src, &info, &s, &draft, &cache);
     let clarity_plane = |c: &StageCache| c.entries.lock().unwrap().first().and_then(|e| e.planes.clarity.clone()).unwrap().1;

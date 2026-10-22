@@ -113,6 +113,27 @@ fn preview_noise_reduction_matches() {
     }
 }
 
+#[test]
+fn coherent_noise_reduction_processes_match() {
+    if !gpu() {
+        return;
+    }
+    let src = Arc::new(Rgb32f::from_fn(256, 192, |x, y| {
+        let texture = 0.3 * (std::f32::consts::TAU * (0.8660254 * x as f32 + 0.5 * y as f32) / 4.0).sin();
+        let noise = 0.03 * (((x * 73 + y * 151) % 113) as f32 / 56.0 - 1.0);
+        [0.18 * (texture + noise).exp2(); 3]
+    }));
+    for process in Process::ALL {
+        let mut s = DevelopSettings { process: process.version(), ..Default::default() };
+        s.detail.nr_luminance = 61.0;
+        s.detail.nr_detail = 87.0;
+        s.detail.nr_contrast = 65.0;
+        for edge in [256, 128, 64] {
+            check(&format!("coherent NR {process:?} {edge}"), &src, &SourceInfo::default(), &s, &RenderRequest::fit(edge, edge));
+        }
+    }
+}
+
 /// A render big enough for the per-pixel stage to run in several bands of rows (and the render
 /// in many submissions), with grain (position-dependent) and masks.
 #[test]
@@ -225,6 +246,11 @@ fn cases() -> Vec<(&'static str, Edit)> {
         ("sharpen masking", |s| {
             s.detail.sharpen_amount = 90.0;
             s.detail.sharpen_masking = 60.0;
+        }),
+        ("sharpen radius and detail", |s| {
+            s.detail.sharpen_amount = 80.0;
+            s.detail.sharpen_radius = 2.0;
+            s.detail.sharpen_detail = 75.0;
         }),
         ("white balance", |s| {
             s.wb.mode = WbMode::Custom;
@@ -876,4 +902,35 @@ fn windows_of_a_big_photo_share_one_uploaded_source() {
     assert_eq!(lightcraft_gpu::shared_source_bytes(), 0, "an idle app gives it back");
     lightcraft_gpu::render(&src, &info, &s, &at(1000), Some(&after)).expect("gpu render");
     assert_eq!(lightcraft_gpu::source_uploads() - start, 2);
+}
+#[test]
+fn independent_sharpening_bands_and_cache_match() {
+    if !gpu() {
+        return;
+    }
+    let src = scene(2, 1024, 256);
+    let info = SourceInfo::default();
+    let req = RenderRequest::fit(1024, 256);
+    let cache = StageCache::default();
+    for process in Process::ALL {
+        let mut s = DevelopSettings { process: process.version(), ..Default::default() };
+        s.effects.texture = 30.0;
+        s.masks.push(Mask {
+            components: vec![MaskComponent {
+                name: None,
+                op: MaskOp::Add,
+                invert: false,
+                shape: MaskShape::Radial { center: Point::new(0.25, 0.5), rx: 0.12, ry: 0.08, angle: 0.0, feather: 0.0, invert: false },
+            }],
+            adjust: lightcraft_develop::LocalAdjustments { sharpness: 70.0, noise: 20.0, ..Default::default() },
+            ..Default::default()
+        });
+        for radius in [0.5, 3.0, 1.0, 0.5] {
+            s.detail.sharpen_radius = radius;
+            check("separate texture/sharpen", &src, &info, &s, &req);
+            let fresh = lightcraft_gpu::render(&src, &info, &s, &req, None).expect("GPU");
+            let warm = lightcraft_gpu::render(&src, &info, &s, &req, Some(&cache)).expect("GPU");
+            assert_eq!(fresh.image, warm.image, "{process:?} radius {radius}: stale plane");
+        }
+    }
 }

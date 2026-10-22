@@ -273,7 +273,7 @@ pub fn base_detail_radius(px_per_long: f64) -> usize {
 pub fn tone_base_detail(s: &DevelopSettings, px_per_long: f64) -> usize {
     match s.process.process() {
         Process::V1 => 0,
-        Process::V2 => base_detail_radius(px_per_long),
+        Process::V2 | Process::V3 => base_detail_radius(px_per_long),
     }
 }
 
@@ -297,6 +297,12 @@ pub struct NrLum {
     pub sigma: f32,
     pub eps: f32,
     pub k: f32,
+    /// Coherent-texture protection, 0 for the frozen V1/V2 filter.
+    pub protection: f32,
+    /// Cell-centred gradient contribution in reduced previews: Scharr vanishes at Nyquist.
+    pub gradient_mix: f32,
+    /// Edge contrast retention, 0 for the frozen V1/V2 filter.
+    pub contrast: f32,
 }
 
 /// Colour noise reduction: chromaticity blurred by `sigma` px, mixed in by `t`.
@@ -344,7 +350,11 @@ pub fn nr_params(s: &DevelopSettings, scale: f32) -> (Option<NrLum>, Option<NrCo
     let l = (lum > 0.0).then(|| nr_radius((1.0 + 2.5 * lum) * scale)).filter(|&(_, w)| w >= NR_MIN_BLEND).map(|(sigma, w)| {
         let detail = (s.detail.nr_detail / 100.0) as f32;
         let eps = ((0.002 + lum * lum * 0.25 * (1.0 - 0.7 * detail)) * scale * scale).max(1e-7);
-        NrLum { sigma, eps, k: lum.sqrt() * w }
+        let (protection, contrast) = match s.process.process() {
+            Process::V1 | Process::V2 => (0.0, 0.0),
+            Process::V3 => (detail * (2.0 - detail), (s.detail.nr_contrast / 100.0) as f32),
+        };
+        NrLum { sigma, eps, k: lum.sqrt() * w, protection, gradient_mix: (2.0 * (1.0 - scale)).min(1.0), contrast }
     });
     let smooth = 1.0 + (s.detail.nr_color_smoothness / 100.0) as f32;
     let c = (col > 0.0).then(|| nr_radius((1.5 + 6.0 * col) * scale * smooth)).filter(|&(_, w)| w >= NR_MIN_BLEND).map(|(sigma, w)| {
@@ -368,7 +378,7 @@ pub fn apply_nr(img: &mut Rgb32f, lum: Option<NrLum>, col: Option<NrColor>) {
     if let Some(nr) = lum {
         let _t = crate::profiling().then(std::time::Instant::now);
         let l = img.map(log_lum);
-        let f = guided(&l, nr.sigma, nr.eps);
+        let f = guided_nr(&l, nr);
         for_rows(&mut img.data, w, |y, row| {
             for (x, p) in row.iter_mut().enumerate() {
                 let i = y * w + x;
@@ -403,6 +413,91 @@ pub fn apply_nr(img: &mut Rgb32f, lum: Option<NrLum>, col: Option<NrColor>) {
     }
 }
 
+/// The frozen self-guided NR base, with V3's detail-controlled tangential smoothing where the
+/// local Scharr structure tensor has a dominant direction. Isotropic areas keep the old filter.
+pub fn guided_nr(p: &Plane, nr: NrLum) -> Plane {
+    if p.is_empty() {
+        return p.clone();
+    }
+    let mut basic = guided(p, nr.sigma, nr.eps);
+    if nr.protection <= 0.0 && nr.contrast <= 0.0 {
+        return basic;
+    }
+    let mut products = Rgb32f::new(p.width, p.height);
+    for_rows(&mut products.data, p.width, |y, row| {
+        for (x, v) in row.iter_mut().enumerate() {
+            let (x, y) = (x as isize, y as isize);
+            let at = |x, y| p.get_clamped(x, y);
+            let gx =
+                (3.0 * (at(x + 1, y - 1) - at(x - 1, y - 1)) + 10.0 * (at(x + 1, y) - at(x - 1, y)) + 3.0 * (at(x + 1, y + 1) - at(x - 1, y + 1)))
+                    / 32.0;
+            let gy =
+                (3.0 * (at(x - 1, y + 1) - at(x - 1, y - 1)) + 10.0 * (at(x, y + 1) - at(x, y - 1)) + 3.0 * (at(x + 1, y + 1) - at(x + 1, y - 1)))
+                    / 32.0;
+            *v = [gx * gx, gx * gy, gy * gy];
+            if nr.gradient_mix > 0.0 {
+                let a = at(x, y);
+                let b = at(x + 1, y);
+                let c = at(x, y + 1);
+                let d = at(x + 1, y + 1);
+                let cx = (b - a + d - c) * 0.5;
+                let cy = (c - a + d - b) * 0.5;
+                for (v, cell) in v.iter_mut().zip([cx * cx, cx * cy, cy * cy]) {
+                    *v += nr.gradient_mix * (cell - *v);
+                }
+            }
+        }
+    });
+    let tensor = gaussian(&products, nr.sigma);
+    drop(products);
+    let weights: [f32; 9] = std::array::from_fn(|i| (-0.5 * ((i as f32 - 4.0) / nr.sigma).powi(2)).exp());
+    let total: f32 = weights.iter().sum();
+    let tau_contrast = 0.005f32;
+    for_rows(&mut basic.data, p.width, |y, row| {
+        for (x, (v, &[xx, xy, yy])) in row.iter_mut().zip(tensor.row(y)).enumerate() {
+            let disc = ((xx - yy).powi(2) + 4.0 * xy * xy).sqrt();
+            let small = ((xx + yy - disc) * 0.5).max(0.0);
+            let large = (xx + yy + disc) * 0.5;
+            if nr.protection > 0.0 {
+                let confidence = nr.protection * (1.0 - 4.0 * small / large.max(1e-12)).clamp(0.0, 1.0);
+                if confidence > 0.0 {
+                    let (tx, ty) = if xx >= yy { (-xy, xx - small) } else { (yy - small, -xy) };
+                    let norm = tx.hypot(ty).max(1e-12);
+                    let (tx, ty) = (tx / norm, ty / norm);
+                    let mut sum = 0.0;
+                    for (step, weight) in (-4..=4).zip(weights) {
+                        sum += weight * tangent_sample(p, x as isize, y as isize, tx, ty, step as f32);
+                    }
+                    *v += confidence * (sum / total - *v);
+                }
+            }
+            if nr.contrast > 0.0 && large > tau_contrast {
+                let c_edge = ((large - tau_contrast) / (large + tau_contrast)).clamp(0.0, 1.0);
+                let p_orig = p.get_clamped(x as isize, y as isize);
+                *v += nr.contrast * 0.5 * c_edge * (p_orig - *v);
+            }
+        }
+    });
+    basic
+}
+
+// Bilinear sampling blurs a fine diagonal even along its tangent. Weight the surrounding lattice
+// points by their distance across the tangent, continuously to avoid direction-selection jumps.
+pub(crate) fn tangent_sample(p: &Plane, x: isize, y: isize, tx: f32, ty: f32, step: f32) -> f32 {
+    let (px, py) = (tx * step, ty * step);
+    let (mut sample, mut total) = (0.0, 0.0);
+    let (lx, ly) = (px.floor() as isize, py.floor() as isize);
+    for dx in [lx, lx + 1] {
+        for dy in [ly, ly + 1] {
+            let cost = (tx * dy as f32 - ty * dx as f32).powi(2) + 0.001 * ((dx as f32 - px).powi(2) + (dy as f32 - py).powi(2));
+            let w = (0.001 + cost).recip().powi(4);
+            sample += w * p.get_clamped(x + dx, y + dy);
+            total += w;
+        }
+    }
+    sample / total
+}
+
 pub fn log_lum(c: [f32; 3]) -> f32 {
     (luminance_2020(c).max(1e-7) / crate::tone::GREY).log2()
 }
@@ -419,6 +514,7 @@ pub(crate) struct Planes {
     pub base: Option<(BaseKey, Arc<Plane>)>,
     pub clarity: Option<(u32, Arc<Plane>)>,
     pub texture: Option<(u32, Arc<Plane>)>,
+    pub sharpening: Option<(u32, Arc<Plane>)>,
     /// Dark channel and its airlight.
     pub dark: Option<(u32, Arc<Plane>, f32)>,
     /// Blurred chromaticity (local Moiré / Noise).
@@ -430,7 +526,7 @@ impl Planes {
     /// enough for a draft: the wide blurs (base, clarity, dehaze, chromaticity). Its `key` matches
     /// no image, so only another draft takes them.
     pub fn for_other_nr(self) -> Planes {
-        Planes { key: 0, pre_nr: self.pre_nr, log_l: None, texture: None, ..self }
+        Planes { key: 0, pre_nr: self.pre_nr, log_l: None, texture: None, sharpening: None, ..self }
     }
 }
 
@@ -480,8 +576,10 @@ pub struct PlaneSigmas {
     pub base_detail: usize,
     /// Clarity band (fast guided filter, [`CLARITY_EPS`]).
     pub clarity: Option<f32>,
-    /// Texture / sharpening band (Gaussian).
+    /// Texture / local noise / defringe band (Gaussian).
     pub texture: Option<f32>,
+    /// Sharpening band (Gaussian), independent of Texture and mask adjustments.
+    pub sharpening: Option<f32>,
     /// Dehaze dark channel (Gaussian).
     pub dark: Option<f32>,
     /// Chromaticity blur for local Moiré / colour noise (Gaussian).
@@ -507,16 +605,18 @@ pub fn plane_sigmas(s: &DevelopSettings, px_per_long: f64, q: Quality) -> PlaneS
     let clarity = (s.effects.clarity != 0.0 || local_any(|a| a.clarity)).then(|| (0.012 * ppl).max(1.0));
     // local Noise and Defringe read the fine detail band too
     let texture = (s.effects.texture != 0.0
-        || s.detail.sharpen_amount != 0.0
         || local_any(|a| a.texture)
-        || local_any(|a| a.sharpness)
         || local_any(|a| a.noise)
         || s.masks.iter().filter(live).any(|m| m.adjust.defringe > 0.0))
     .then(|| (0.0018 * ppl).max(0.6));
+    let sharpening = (s.detail.sharpen_amount != 0.0 || local_any(|a| a.sharpness)).then(|| match s.process.process() {
+        Process::V1 | Process::V2 => (0.0018 * ppl).max(0.6),
+        Process::V3 => ((s.detail.sharpen_radius as f32).clamp(0.5, 3.0) * 0.0006 * ppl).max(0.6),
+    });
     let dark = (s.effects.dehaze != 0.0 || local_any(|a| a.dehaze)).then(|| (0.02 * ppl).max(1.0));
     let chroma = (local_any(|a| a.moire) || s.masks.iter().filter(live).any(|m| m.adjust.noise > 0.0)).then(|| (CHROMA_SIGMA * ppl).max(1.0));
     let base_detail = if base.is_some() { tone_base_detail(s, px_per_long) } else { 0 };
-    PlaneSigmas { base, base_detail, clarity, texture, dark, chroma }
+    PlaneSigmas { base, base_detail, clarity, texture, sharpening, dark, chroma }
 }
 
 /// The spatial planes the per-pixel stage needs for `img` (white-balanced, before exposure),
@@ -533,8 +633,15 @@ pub(crate) fn prepare(
     mattes: Option<&masks::Mattes>,
 ) -> Prepared {
     let log_l = planes.log_l.get_or_insert_with(|| Arc::new(timed("log_l", || img.map(log_lum)))).clone();
-    let PlaneSigmas { base: base_sigma, base_detail, clarity: clarity_sigma, texture: texture_sigma, dark: dark_sigma, chroma: chroma_sigma } =
-        plane_sigmas(s, px_per_long, q);
+    let PlaneSigmas {
+        base: base_sigma,
+        base_detail,
+        clarity: clarity_sigma,
+        texture: texture_sigma,
+        sharpening: sharpening_sigma,
+        dark: dark_sigma,
+        chroma: chroma_sigma,
+    } = plane_sigmas(s, px_per_long, q);
 
     let Planes { base: sb, clarity: sc, texture: st, dark: sd, chroma: sch, .. } = planes;
     let chroma_blur = chroma_sigma.map(|sg| match sch {
@@ -570,6 +677,12 @@ pub(crate) fn prepare(
             )
         },
     );
+    let sharpening_blur = sharpening_sigma.map(|sg| {
+        if sharpening_sigma == texture_sigma {
+            planes.sharpening = planes.texture.clone();
+        }
+        plane_at(&mut planes.sharpening, sg.to_bits(), || timed("sharpening", || gaussian(l, sg)))
+    });
     let base = base.unwrap_or_else(|| log_l.clone());
     let (dark, air) = match dark {
         Some((d, air)) => (Some(d), air),
@@ -577,7 +690,7 @@ pub(crate) fn prepare(
     };
     let ev = s.light.exposure as f32;
     let masks = timed("masks", || masks::evaluate(&s.masks, frame, img.width, img.height, &img, &log_l, ev, mattes));
-    Prepared { img, log_l, base, clarity_blur, texture_blur, dark, chroma_blur, air, masks, px_per_long }
+    Prepared { img, log_l, base, clarity_blur, texture_blur, sharpening_blur, dark, chroma_blur, air, masks, px_per_long }
 }
 
 /// The airlight of the whole output frame, estimated on a small render of it (`proxy_w` px wide):

@@ -50,6 +50,8 @@ const MODULES: &[Module] = &[
             "guided_apply",
             "wb_k",
             "nr_lum",
+            "nr_tensor",
+            "nr_coherent",
             "chroma_k",
             "nr_col",
             "subsample",
