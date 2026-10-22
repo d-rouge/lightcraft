@@ -1,5 +1,5 @@
 // The per-pixel stage: a straight port of `lightcraft_pipeline::finish` (keep in step with it).
-// Bindings: img (rgb, pre-exposure), log_l, base, clar, tex, dark, masks (NMASK planes, then the
+// Bindings: img (rgb, pre-exposure), log_l, base, clar, tex (texture and sharpening bands), dark, masks (NMASK planes, then the
 // blurred chromaticity when HAS_CHROMA), aux
 // (tone LUT | chroma curve | sRGB LUT | curve LUTs | mask terms), out (packed RGBA8).
 
@@ -379,17 +379,34 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
     }
     let tx = pf(F_TEX) + lt[8];
     let sp = lt[13] * 0.6 + pf(F_SHARPEN);
-    if ((tx != 0.0 || sp != 0.0) && pu(F_HAS_TEX) != 0u) {
+    if (tx != 0.0 && pu(F_HAS_TEX) != 0u) {
         let det = l_pre - tex[i];
         let tame = 1.0 - 0.6 * sstep(0.4, 1.6, abs(det));
         delta += tx * 1.1 * clamp(det, -1.0, 1.0) * tame;
-        if (sp != 0.0) {
-            let sm = pf(F_SHARPEN_MASK);
-            var mk = 1.0;
-            if (sm > 0.0) {
-                mk = sstep(sm * 0.25, sm * 0.25 + 0.15, abs(det));
-            }
+    }
+    if (sp != 0.0 && pu(F_HAS_SHARP) != 0u) {
+        let det = l_pre - tex[pu(F_SHARP_OFF) + i];
+        let sm = pf(F_SHARPEN_MASK);
+        var mk = 1.0;
+        if (sm > 0.0) {
+            mk = sstep(sm * 0.25, sm * 0.25 + 0.15, abs(det));
+        }
+        let s_detail = pf(F_SHARPEN_DETAIL);
+        if (s_detail < 0.0) {
             delta += sp * 1.3 * clamp(det, -0.8, 0.8) * mk;
+        } else {
+            var clamp_limit = 0.8;
+            var micro_boost = 1.0;
+            if (s_detail <= 0.25) {
+                clamp_limit = 0.20 + (s_detail / 0.25) * 0.60;
+                let gate = sstep(0.01, 0.05, abs(det));
+                micro_boost = (s_detail / 0.25) + (1.0 - s_detail / 0.25) * gate;
+            } else {
+                clamp_limit = 0.80 + ((s_detail - 0.25) / 0.75) * 0.80;
+                micro_boost = 1.0 + (s_detail - 0.25) * 0.6;
+            }
+            let det_eff = det * micro_boost;
+            delta += sp * 1.3 * clamp(det_eff, -clamp_limit, clamp_limit) * mk;
         }
     }
     // local Noise: smooth (or, negative, boost) small-amplitude detail, keep edges
