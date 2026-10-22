@@ -329,6 +329,14 @@ mod tests {
     }
 
     #[test]
+    fn unqualified_xt1_profile_is_opt_in_only() {
+        assert!(bundled("X-T1").is_none());
+        let candidate = parse(include_bytes!("../../../assets/camera-profiles/X-T1.json"), "X-T1 candidate").unwrap();
+        assert_eq!(candidate.model, "X-T1");
+        assert_eq!(candidate.files, 30);
+    }
+
+    #[test]
     fn file_names_are_safe() {
         assert_eq!(file_name("ILCE-7M4"), "ILCE-7M4.json");
         assert_eq!(file_name(" DSC-RX100M3 "), "DSC-RX100M3.json");
