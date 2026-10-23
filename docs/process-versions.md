@@ -1,6 +1,6 @@
 # Process versions
 
-> **Last updated:** 2026-10-22 · **Change:** minor (Process V3 directional NR and independent sharpening bands; V1/V2 frozen)
+> **Last updated:** 2026-10-23 · **Change:** patch (retain V3 research and competing-proposal context; rendering unchanged)
 
 Every photo's develop settings record the **rendering process** they are interpreted by
 (`DevelopSettings::process`, a `ProcessVersion` in `crates/develop/src/settings.rs`). Lightroom calls
@@ -38,6 +38,11 @@ threshold, not a calibrated sensor noise floor. These checks establish algorithm
 and compatibility invariants, not Lightroom fidelity or real-sensor calibration.
 Independent real-scene references and measured preview/export budgets remain
 open; no feature-count or readiness increase is claimed.
+
+The [retained V3 research record](process-v3-research.md) separates the original
+settings ablation, directional-NR measurements and later sharpening corrections.
+It also records competing proposals and their provisional V3 numbering; coordinate
+process composition with maintainers before publishing.
 
 ## The rule
 
@@ -108,6 +113,7 @@ saved as V1.
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-23 | patch | Preserve downstream ablations, superseded-claim caveats and competing-PR/process-numbering context without changing rendering. |
 | 2026-10-22 | minor | Process V3 adds directional luminance NR and independent Radius/Detail sharpening on CPU/GPU; legacy V1/V2 paths retained, cache/mask regressions and qualification limits documented. |
 
 ## Storage
