@@ -1,6 +1,6 @@
 # Gaps: where LightCraft falls short of Lightroom
 
-> **Last reviewed:** 2026-10-11 · **Last updated:** 2026-10-23 · **Change:** minor (gap 28: ⌘L Enable Filters switches the filter off and on; gap 28: F8 shows / hides the right panel; import review album hierarchy, #2362; gap 20: Minolta MRW decodes; gap 10: 551 models verified; gap 15: Print Page Options — page numbers, page info, crop marks; gap 15: Print Page Options — page numbers, page info, crop marks; gap 28: `\` shows / hides the Filter Bar in the grids; gap 21: Indonesian interface shipped, every message but What's New; gap 27: the Windows x64 installer verified on Windows 11; the Settings → Apps uninstall confirmation remains)
+> **Last reviewed:** 2026-10-11 · **Last updated:** 2026-10-23 · **Change:** minor (gap 18: MP4/MOV/M4V import and cataloguing, with duration badges and a loupe card; playback, trim, edits and export remain, 20–40 h; gap 28: ⌘L Enable Filters switches the filter off and on; gap 28: F8 shows / hides the right panel; import review album hierarchy, #2362; gap 20: Minolta MRW decodes; gap 10: 551 models verified; gap 15: Print Page Options — page numbers, page info, crop marks; gap 15: Print Page Options — page numbers, page info, crop marks; gap 28: `\` shows / hides the Filter Bar in the grids; gap 21: Indonesian interface shipped, every message but What's New; gap 27: the Windows x64 installer verified on Windows 11; the Settings → Apps uninstall confirmation remains)
 
 Every known shortfall, one entry each, ranked by user impact (how many Lightroom users hit it, and
 how hard it blocks them), then by effort. **Agents pick work from the top** (the first entry nobody is
@@ -32,7 +32,7 @@ Hours are Opus 5.5 agent wall-clock hours (see [target-app-parity.md](target-app
 | 15 | **Print module**: identity plate / watermark / photo info overlays, Cut Guides for the packages, Custom Package Auto Layout, printer-driver Page Setup and direct printing, JPEG file output (the Print dialog writes a colour-managed PDF) | LRC-PRINT rows | Classic users who print | 15–25 | [target-app-parity](target-app-parity.md#features) |
 | 16 | **Map view, Book, Slideshow module, publish services** | LRC-MAP / BOOK / SS rows ⬜ | Classic users; publish services matter for Flickr / SmugMug workflows | 60–100 | [target-app-parity](target-app-parity.md#features) |
 | 17 | **Tethered capture** | ⬜ | studio photographers | 25–45 + cameras | [hardware-parity](hardware-parity.md) |
-| 18 | **Video**: playback, trim, global edits, export | VID rows 0% | users who mix stills and clips | 25–45 | [target-app-parity](target-app-parity.md#features) |
+| 18 | **Video**: playback, trim, global edits, export (MP4/MOV/M4V import and cataloguing landed 2026-10-23) | VID rows 10% (one 🟡: imported and catalogued, no player) | users who mix stills and clips | 20–40 | [target-app-parity](target-app-parity.md#features) |
 | 19 | **Plug-in ecosystem**: no Lightroom SDK equivalent (export / publish plug-ins, metadata plug-ins) | ⬜ | pro workflows built on plug-ins (LR/Enfuse, Jeffrey's exporters, Negative Lab Pro) | 40–80 + owner decision | [target-app-parity](target-app-parity.md#by-dimension) |
 | 20 | **Long-tail raw formats**: compressed SRW, ARQ pixel shift, IIQ, Hasselblad compression, X3F, CRW, ERF, KDC, DCR, MEF, GPR, old FinePix (MRW decodes since 2026-10-18) | raw-parity.md | small user share each | 40–80 | [raw-parity](raw-parity.md) |
 | 21 | **Localization**: 10 of 16 shipped languages partial (de, es, fr, ja, uk now 97–99% of catalog messages and id every message but What's New, awaiting native review; pt-BR, ru, zh-hans, zh-hant 74–92%), lower-layer errors English; Hindi, Arabic, Korean, Vietnamese absent; no RTL or complex shaping | measured from catalogs | non-English users see mixed English | 40–70 (shipped to full); 135–239 (four new) | [localization-parity](localization-parity.md) |
@@ -84,6 +84,7 @@ Beta-blocking gaps (B) total **~230–430 h**; with the stability and platform w
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-23 | minor | Gap 18 shrinks: MP4/MOV/M4V import and cataloguing, grid format/duration badges and a loupe card (VID rows 10%, one 🟡); playback, trim, edits and export remain, 20–40 h |
 | 2026-10-22 | patch | XMP namespace-prefix collisions no longer overwrite foreign metadata; ranked gaps and estimates unchanged |
 | 2026-10-22 | patch | Issue #2519: PSD/PSB EXIF resource 1058 and XMP resource 1060 now use the common metadata extractor, and `.psb` files are accepted by import; no ranked gap or readiness count changes |
 | 2026-10-22 | minor | Gap 30 added: multi-select metadata editing — Info panel and All Metadata dialog show one photo's values with no mixed-value indication |
