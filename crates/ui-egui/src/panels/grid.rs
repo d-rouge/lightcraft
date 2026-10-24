@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use egui::{Align2, Color32, Rect, Sense, Stroke, StrokeKind, pos2, vec2};
-use lightcraft_catalog::{Catalog, ColorLabel, DateRun, Flag, GroupBy, MediaKind, PhotoId, SortKey, StackId};
+use lightcraft_catalog::{Catalog, ColorLabel, DateRun, Flag, GroupBy, PhotoId, SortKey, StackId};
 use serde_json::json;
 
 use crate::LightcraftApp;
@@ -773,7 +773,7 @@ fn cell(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId, r: Rect, square
     let selected = state != lightcraft_engine::SelectionState::NotSelected;
     // A video has no decoded thumbnail yet (playback comes in a later update), so what the cell
     // draws for it is a placeholder plus these badges rather than a failed image.
-    let video = photo.kind == MediaKind::Video || photo.duration.is_some();
+    let video = photo.is_video() || photo.duration.is_some();
     // screen readers: the file, then rating / flag / label
     let mut spoken = photo.file_name.clone();
     if video && let Some(d) = photo.duration {
@@ -867,7 +867,7 @@ fn cell(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId, r: Rect, square
         p.galley(br.min + vec2(4.0, 1.5), g, t.text_label);
         if video {
             // the same automation id the justified grid's video badge carries
-            register(ui.ctx(), format!("badge:videoFormat:{}", id.0), br);
+            register(ui, format!("badge:videoFormat:{}", id.0), br);
         }
     }
     // A video's format (where the square grid's filename line doesn't carry it already) and its
@@ -987,7 +987,7 @@ fn video_format_badge(ui: &egui::Ui, p: &egui::Painter, t: &Tokens, id: PhotoId,
     let br = Rect::from_min_size(pos2(img_rect.right() - g.size().x - 14.0, img_rect.top() + 6.0), g.size() + vec2(8.0, 3.0));
     p.rect_filled(br, 3.0, Color32::from_black_alpha(170));
     p.galley(br.min + vec2(4.0, 1.5), g, Color32::WHITE);
-    register(ui.ctx(), format!("badge:videoFormat:{}", id.0), br);
+    register(ui, format!("badge:videoFormat:{}", id.0), br);
 }
 
 /// A clip's running time (video icon + `MM:SS`) in a dark pill at the thumbnail's lower edge,
@@ -1006,7 +1006,7 @@ fn video_duration_badge(ui: &egui::Ui, p: &egui::Painter, t: &Tokens, id: PhotoI
     p.rect_filled(br, 8.5, Color32::from_black_alpha(175));
     paint(p, Rect::from_center_size(pos2(br.left() + 11.0, br.center().y), vec2(12.0, 12.0)), Icon::Video, Color32::WHITE);
     p.galley(pos2(br.left() + 19.0, br.center().y - g.size().y / 2.0), g, Color32::WHITE);
-    register(ui.ctx(), format!("badge:videoDuration:{}", id.0), br);
+    register(ui, format!("badge:videoDuration:{}", id.0), br);
 }
 
 /// The header of a Local folder view: the path as a breadcrumb (each part opens that folder),

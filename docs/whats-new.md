@@ -2,6 +2,15 @@
 
 ## 2026-10-24
 
+### Videos join the library
+- MP4, MOV and M4V clips are found by folder import and catalogued like photos: LightCraft reads the container's
+  duration, display size (including a phone's rotation), capture date, camera and GPS from the movie header and
+  QuickTime metadata, and the grid's Videos filter lists them with their length and container. The loupe shows a card
+  naming the clip instead of a broken-photo error, and Info lists its Duration.
+- A clip cannot be played, trimmed or edited yet, and it has no still to render: a JPEG, print, contact sheet or
+  rendered slideshow leaves it out and says so per file (Original format still copies the clip). Edits to a
+  catalogued clip are kept, but nothing decodes its frames until the player lands.
+
 ### Relative-date filters and smart albums follow the clock
 - A current view or source count using “in the last” rules now refreshes when the session clock moves into a new
   minute, even when no catalog edit occurred. This fixes stale photos remaining in the grid and stale counts for

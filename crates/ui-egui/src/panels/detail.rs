@@ -157,7 +157,7 @@ fn video_card(ui: &egui::Ui, p: &egui::Painter, t: &Tokens, photo: &lightcraft_c
     }
     y += 14.0;
     p.galley(pos2(card.center().x - message.size().x / 2.0, y), message, t.text_dim);
-    register(ui.ctx(), "canvas:videoCard", card);
+    register(ui, "canvas:videoCard", card);
 }
 
 /// Draw the Develop loupe: the optional filmstrip, the fitted or zoomed photo (before/after and
@@ -476,7 +476,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     // A catalogued video has no frame to decode or show yet (playback, trim and cover frames come
     // in a later update): its card stands in for the picture in every view mode, instead of the
     // error a broken photo shows or a blank pane.
-    let video_only = photo.kind == lightcraft_catalog::MediaKind::Video
+    let video_only = photo.is_video()
         && app.renderer.textures.get(&Slot::Main).is_none_or(|t| t.photo != id)
         && app.renderer.textures.get(&Slot::Preview).is_none_or(|t| t.photo != id);
     if video_only {
@@ -672,7 +672,7 @@ pub fn show(app: &mut LightcraftApp, ui: &mut egui::Ui) {
     .then(|| app.renderer.failure_of(Slot::Main, id))
     .flatten();
     // (a catalogued video has no frame to render: its card is all there is, not a failure)
-    if (rendering || failed.is_some()) && photo.kind != lightcraft_catalog::MediaKind::Video {
+    if (rendering || failed.is_some()) && !photo.is_video() {
         // over the photo (the After in two views); in the crop tool's wide margin, under it
         let over = if crop_tool { canvas } else { img_rect.intersect(if split { main_area } else { canvas }) };
         let over = if over.is_positive() { over } else { canvas };

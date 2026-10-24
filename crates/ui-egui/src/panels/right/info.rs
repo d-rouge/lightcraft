@@ -263,7 +263,7 @@ fn camera_card(ui: &mut egui::Ui, p: &lightcraft_catalog::Photo) {
                 if let Some(d) = &duration {
                     ui.label(dim(crate::i18n::tr("Duration")));
                     let r = ui.label(dim(d));
-                    register(ui.ctx(), "info:duration", r.rect);
+                    register(ui, "info:duration", r.rect);
                     ui.end_row();
                 }
             });
