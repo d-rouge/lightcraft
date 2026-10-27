@@ -379,7 +379,7 @@ differences and missing bindings are in [ui-parity.md](ui-parity.md#shortcuts).
 
 | Id | Feature | Tier | Status | Evidence | Missing / notes |
 |---|---|---|---|---|---|
-| LR-VID-PLAY | Video playback | P1 | 🟡 | `crates/catalog/src/model.rs`, `crates/meta/src/video.rs`, `crates/engine/src/import.rs`, `crates/ui-egui/src/panels/grid.rs` | videos can be imported and catalogued (kind, duration, dimensions, capture date, camera/GPS), including legacy clips in filters and smart albums; the 🟡 is import and cataloguing, not playback: format/duration badges, loupe and culling cards, screen-reader video labels even without duration, per-file warnings for rendered exports/print/contact sheets; native Original copies stream and browser videos use Blobs without a clip-size cap; failed browser loads wait for selection change/retry; Remove Location permits verified location-free clips, not GPS-bearing or unverifiable metadata, including QuickTime metadata layouts; no player yet |
+| LR-VID-PLAY | Video playback | P1 | 🟡 | `crates/catalog/src/model.rs`, `crates/meta/src/video.rs`, `crates/engine/src/import.rs`, `crates/ui-egui/src/panels/grid.rs` | videos can be imported and catalogued (kind, duration, dimensions, capture date, camera/GPS), including legacy clips in filters and smart albums; the 🟡 is import and cataloguing, not playback: format/duration badges, loupe and culling cards, screen-reader video labels even without duration, per-file warnings for rendered exports/print/contact sheets; native Original copies stream and browser videos use Blobs without a clip-size cap; failed browser loads wait for selection change/retry; Remove Location permits verified location-free clips, not embedded GPS, recognized place names or unverifiable metadata, including QuickTime metadata layouts; no player yet |
 | LR-VID-TRIM | Trim | P1 | ⬜ | | |
 | LR-VID-EDIT | Edits on video | P2 | ⬜ | | |
 | LR-VID-COVER | Cover frame | P2 | ⬜ | | |
@@ -800,6 +800,7 @@ Latin stays upright. Advanced Japanese composition remains open. Regression cove
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-27 | patch | LR-VID-PLAY privacy follow-up: unchanged Original video exports with Remove Location reject recognized embedded XMP place names even without GPS, consistently in browser, filesystem and buffered paths. Empty fields remain allowed; status counts unchanged |
 | 2026-10-27 | patch | LR-VID-PLAY follow-up: Compare/Reference/Survey use video cards, grids announce clips without duration, legacy import candidates schedule no frame job, and QuickTime extraction/location verification share layout handling. Browser failures wait for retry; fragmented scans remain bounded. Status counts unchanged |
 | 2026-10-27 | patch | Cache budgets control retention/concurrency, not original file admission; physical/platform capacity and fallible allocation guard buffers. Browser cache ownership avoids another whole-file copy. Status counts unchanged |
 | 2026-10-27 | patch | Video review audit: content-based bounded probing, truthful CLI no-output errors and configurable buffering budgets without a fixed file-size restriction; status counts unchanged |
