@@ -776,10 +776,14 @@ fn cell(app: &mut LightcraftApp, ui: &mut egui::Ui, id: PhotoId, r: Rect, square
     let video = photo.is_video() || photo.duration.is_some();
     // screen readers: the file, then rating / flag / label
     let mut spoken = photo.file_name.clone();
-    if video && let Some(d) = photo.duration {
-        let text = crate::widgets::format_duration(d);
-        if !text.is_empty() {
-            spoken.push_str(&format!(", {} {text}", crate::i18n::tr("Video")));
+    if video {
+        spoken.push_str(&format!(", {}", crate::i18n::tr("Video")));
+        if let Some(d) = photo.duration {
+            let text = crate::widgets::format_duration(d);
+            if !text.is_empty() {
+                spoken.push(' ');
+                spoken.push_str(&text);
+            }
         }
     }
     if photo.rating > 0 {
