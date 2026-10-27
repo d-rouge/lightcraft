@@ -2,7 +2,7 @@
 
 **Stage: alpha** · next: beta, ~14 points and ~340–600 h away
 
-> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-23 · **Change:** minor (video: MP4/MOV/M4V import and cataloguing, with duration badges and a loupe card; no playback, trim, edits, presets or export; Video 0% → 10% breadth and readiness; headline numbers unchanged; Print: Japanese photo and postcard paper sizes) · **Target:** Adobe Lightroom Classic 15.5 / Lightroom 9.6
+> **Last reviewed:** 2026-10-10 · **Last updated:** 2026-10-27 · **Change:** patch (video review: streamed Original copies and browser Blobs, cache-independent original buffering, content-based bounded probes and truthful CLI errors, location verification, legacy filtering; no playback, trim, edits, presets or transcoded export; headline numbers unchanged; Print: Japanese photo and postcard paper sizes) · **Target:** Adobe Lightroom Classic 15.5 / Lightroom 9.6
 
 One-page summary of how close LightCraft is to Adobe Lightroom. Agents: read this, then pick work
 from [docs/gaps.md](docs/gaps.md). The full assessment, method and evidence are in
@@ -191,6 +191,9 @@ Ranked toward beta; detail in [docs/roadmap.md](docs/roadmap.md), gaps in [docs/
 
 | Date | Change | Summary |
 |---|---|---|
+| 2026-10-27 | patch | Original buffers no longer use cache budgets for file admission: platform capacity, known physical RAM and fallible allocation guard buffers; browser caching avoids the handoff copy. Counts and hours unchanged |
+| 2026-10-27 | patch | Video review audit: renamed clips use bounded metadata reads; CLI render rejects skipped videos; whole-buffer originals follow the configurable memory budget instead of the fixed 256 MiB restriction. Counts and hours unchanged |
+| 2026-10-27 | patch | Video: streamed Original copies and browser Blobs without a clip-size cap; Remove Location allows verified location-free clips and rejects GPS-bearing or unverifiable metadata; legacy kind filters fixed. Playback/transcoding remain; breadth, readiness and hours unchanged |
 | 2026-10-23 | minor | Video: MP4/MOV/M4V import and cataloguing (duration, dimensions, date, camera/GPS), grid badges and a loupe card; Video 0% → 10% breadth and readiness, 25–45 → 20–40 h |
 | 2026-10-22 | minor | Print: Japanese photo and postcard paper sizes (L判, 2L判, KG判, はがき, 往復はがき, 六切, 四切, 名刺) in the page setup, Print dialog and PDF output; headline numbers unchanged |
 | 2026-10-19 | minor | Indonesian interface (`id`): every plain and formats message, plus 69 command labels, locale, menu command and tests; What's New left in English; Localization ~55% → ~64% (mean of the 12 key languages), 8 of 12 present |

@@ -413,6 +413,9 @@ impl crate::Session {
 
     /// Synchronous render (CLI, MCP, tests).
     pub fn render_now(&mut self, id: PhotoId, max_w: usize, max_h: usize) -> Result<Rendered, String> {
+        if self.catalog.photo(id).ok_or("no such photo")?.is_video() {
+            return Err("a video has no frame to render".into());
+        }
         let job = self.render_job(id, max_w, max_h, false, true).ok_or("no such photo")?;
         let r = job.run();
         self.accept(&r);
