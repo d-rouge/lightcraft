@@ -24,6 +24,11 @@ mkdir -p "$STAGE"
 # The GUI is `lightcraft-bin`; `lightcraft` is the launcher, so an unpacked tar starts in the
 # Nightly profile instead of the stable settings folder.
 install -m755 "$NIGHTLY_GUI" "$STAGE/lightcraft-bin"
+# Strip DWARF debug info from ELF binaries so release builds with line-tables-only stay well under
+# nightly-archive.py's 512 MiB per-member bound (while leaving non-ELF test stubs untouched).
+if command -v strip >/dev/null 2>&1 && cmp -s <(printf '\177ELF') <(head -c 4 "$STAGE/lightcraft-bin"); then
+  strip --strip-debug "$STAGE/lightcraft-bin"
+fi
 install -m755 "$HERE/nightly-tar-launch.sh" "$STAGE/lightcraft"
 install -m644 "$ROOT/assets/app-icon/lightcraft-nightly.png" "$STAGE/lightcraft-nightly.png"
 nightly_copy_notices "$STAGE"
